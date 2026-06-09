@@ -1,0 +1,41 @@
+name: Daily Reddit Fetch
+
+on:
+  schedule:
+    # 00:30 UTC every day = 09:30 KST = 17:30 PT (previous day).
+    # Reddit window (10am PT yesterday -> 10am PT today) has closed ~7h prior.
+    - cron: "30 0 * * *"
+  workflow_dispatch:  # Allows manual "Run workflow" button
+
+permissions:
+  contents: write  # Required so the workflow can commit pending_posts.json back
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Fetch new Reddit posts (via public RSS)
+        env:
+          USER_AGENT: "canvas-monitor/1.0 (+https://github.com)"
+        run: |
+          python scripts/fetch_reddit.py
+
+      - name: Commit updated pending_posts.json
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/pending_posts.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "data: daily fetch $(date -u +%Y-%m-%d)"
+            git push
+          fi
