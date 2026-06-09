@@ -1,0 +1,40 @@
+name: Backfill (One-time)
+
+# 수동 실행 전용 — 매일 새벽 자동 실행되는 daily_fetch 와는 별개입니다.
+# Actions 탭 → "Backfill (One-time)" → "Run workflow" 로 한 번만 돌리세요.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run backfill (RSS, no time window)
+        env:
+          USER_AGENT: "canvas-monitor/1.0 (+https://github.com)"
+        run: |
+          python scripts/backfill.py
+
+      - name: Commit pending_posts.json
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/pending_posts.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "backfill: $(date -u +%Y-%m-%d) — pull all RSS posts"
+            git push
+          fi
